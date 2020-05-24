@@ -64,6 +64,18 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/x
         <enabled>false</enabled>
       </snapshots>
     </repository>
+    <repository>
+      <id>oss.sonatype.org</id>
+      <url>https://oss.sonatype.org/content/repositories/snapshots</url>
+    </repository>
+    <repository>
+      <snapshots>
+        <enabled>false</enabled>
+      </snapshots>
+      <id>central</id>
+      <name>bintray</name>
+      <url>https://jcenter.bintray.com</url>
+    </repository>
   </repositories>
 
   <licenses>

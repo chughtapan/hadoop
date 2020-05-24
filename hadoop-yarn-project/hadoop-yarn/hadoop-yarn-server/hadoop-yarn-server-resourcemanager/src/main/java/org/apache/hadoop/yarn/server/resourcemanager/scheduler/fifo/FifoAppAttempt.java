@@ -46,9 +46,9 @@ public class FifoAppAttempt extends FiCaSchedulerApp {
   private static final Logger LOG =
       LoggerFactory.getLogger(FifoAppAttempt.class);
 
-  FifoAppAttempt(ApplicationAttemptId appAttemptId, String user,
-      Queue queue, ActiveUsersManager activeUsersManager,
-      RMContext rmContext) {
+  public FifoAppAttempt(ApplicationAttemptId appAttemptId, String user,
+                        Queue queue, ActiveUsersManager activeUsersManager,
+                        RMContext rmContext) {
     super(appAttemptId, user, queue, activeUsersManager, rmContext);
   }
 

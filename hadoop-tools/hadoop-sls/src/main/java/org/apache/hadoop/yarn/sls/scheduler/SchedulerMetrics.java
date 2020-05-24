@@ -58,6 +58,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.Capacity
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.SchedulerEventType;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FairScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fifo.FifoScheduler;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.rl.RLPolicyScheduler;
 import org.apache.hadoop.yarn.sls.conf.SLSConfiguration;
 import org.apache.hadoop.yarn.sls.web.SLSWebApp;
 import org.slf4j.Logger;
@@ -117,6 +118,8 @@ public abstract class SchedulerMetrics {
       metricClass = FairSchedulerMetrics.class;
     } else if (schedulerClass.equals(CapacityScheduler.class)) {
       metricClass = CapacitySchedulerMetrics.class;
+    } else if (schedulerClass.equals(RLPolicyScheduler.class)) {
+      metricClass = RLPolicySchedulerMetrics.class;
     } else if (schedulerClass.equals(FifoScheduler.class)) {
       metricClass = FifoSchedulerMetrics.class;
     }

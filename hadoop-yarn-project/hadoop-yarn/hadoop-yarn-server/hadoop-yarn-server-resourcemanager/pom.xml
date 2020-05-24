@@ -33,6 +33,11 @@
 
   <dependencies>
     <dependency>
+      <groupId>org.pytorch</groupId>
+      <artifactId>pytorch_java_only</artifactId>
+      <version>1.5.0-SNAPSHOT</version>
+    </dependency>
+    <dependency>
       <groupId>javax.servlet</groupId>
       <artifactId>javax.servlet-api</artifactId>
     </dependency>
