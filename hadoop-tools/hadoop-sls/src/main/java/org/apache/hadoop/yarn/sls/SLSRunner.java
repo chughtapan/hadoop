@@ -81,7 +81,7 @@ import org.apache.hadoop.yarn.server.resourcemanager.rmnode.RMNode;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.capacity.CapacityScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fair.FairScheduler;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.fifo.FifoScheduler;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.rl.RLPolicyScheduler;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.rl.RLTrainingScheduler;
 import org.apache.hadoop.yarn.sls.appmaster.AMSimulator;
 import org.apache.hadoop.yarn.sls.conf.SLSConfiguration;
 import org.apache.hadoop.yarn.sls.nodemanager.NMSimulator;
@@ -290,9 +290,9 @@ public class SLSRunner extends Configured implements Tool {
       rmConf.setBoolean(YarnConfiguration.RM_SCHEDULER_ENABLE_MONITORS, true);
       rmConf.set(YarnConfiguration.RM_SCHEDULER_MONITOR_POLICIES,
           ProportionalCapacityPreemptionPolicy.class.getName());
-    } else if (Class.forName(schedulerClass) == RLPolicyScheduler.class) {
+    } else if (Class.forName(schedulerClass) == RLTrainingScheduler.class) {
       rmConf.set(YarnConfiguration.RM_SCHEDULER,
-              SLSRLPolicyScheduler.class.getName());
+              SLSRLTrainingScheduler.class.getName());
     } else if (Class.forName(schedulerClass) == FairScheduler.class) {
       rmConf.set(YarnConfiguration.RM_SCHEDULER,
           SLSFairScheduler.class.getName());

@@ -23,16 +23,14 @@ import org.apache.hadoop.classification.InterfaceStability.Unstable;
 import org.apache.hadoop.conf.Configurable;
 import org.apache.hadoop.conf.Configuration;
 import org.apache.hadoop.yarn.api.records.*;
-import org.apache.hadoop.yarn.exceptions.YarnException;
 import org.apache.hadoop.yarn.server.resourcemanager.rmcontainer.RMContainer;
 import org.apache.hadoop.yarn.server.resourcemanager.rmnode.UpdatedContainerInfo;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.Allocation;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.ContainerUpdates;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerAppReport;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.SchedulerApplication;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.common.ResourceCommitRequest;
 import org.apache.hadoop.yarn.server.resourcemanager.scheduler.event.*;
-import org.apache.hadoop.yarn.server.resourcemanager.scheduler.rl.RLPolicyScheduler;
+import org.apache.hadoop.yarn.server.resourcemanager.scheduler.rl.RLTrainingScheduler;
 import org.apache.hadoop.yarn.sls.SLSRunner;
 import org.apache.hadoop.yarn.sls.conf.SLSConfiguration;
 import org.apache.hadoop.yarn.util.resource.Resources;
@@ -43,15 +41,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
 
 @Private
 @Unstable
-public class SLSRLPolicyScheduler extends RLPolicyScheduler implements
+public class SLSRLTrainingScheduler extends RLTrainingScheduler implements
         SchedulerWrapper,Configurable {
 
   private Configuration conf;
-  private boolean logFileInitialized = false;
 
   private Map<ApplicationAttemptId, String> appQueueMap =
           new ConcurrentHashMap<ApplicationAttemptId, String>();
@@ -68,7 +64,7 @@ public class SLSRLPolicyScheduler extends RLPolicyScheduler implements
     return tracker;
   }
 
-  public SLSRLPolicyScheduler() {
+  public SLSRLTrainingScheduler() {
     tracker = new Tracker();
   }
   
@@ -80,7 +76,7 @@ public class SLSRLPolicyScheduler extends RLPolicyScheduler implements
     if (metricsON) {
       try {
         schedulerMetrics = SchedulerMetrics.getInstance(conf,
-            RLPolicyScheduler.class);
+            RLTrainingScheduler.class);
         schedulerMetrics.init(this, conf);
       } catch (Exception e) {
         e.printStackTrace();
@@ -106,11 +102,6 @@ public class SLSRLPolicyScheduler extends RLPolicyScheduler implements
       } finally {
         context.stop();
         schedulerMetrics.increaseSchedulerAllocationCounter();
-        if (!logFileInitialized) {
-          String logFile = conf.get(SLSConfiguration.METRICS_OUTPUT_DIR) + "/trajectory.log";
-          super.setLogFilePath(logFile);
-          logFileInitialized = true;
-        }
         try {
           updateQueueWithAllocateRequest(allocation, attemptId,
                   resourceRequests, containerIds);
@@ -127,12 +118,6 @@ public class SLSRLPolicyScheduler extends RLPolicyScheduler implements
 
   @Override
   public void handle(SchedulerEvent schedulerEvent) {
-    if (!logFileInitialized) {
-      String logFile = conf.get(SLSConfiguration.METRICS_OUTPUT_DIR) + "/trajectory.log";
-      super.setLogFilePath(logFile);
-      logFileInitialized = true;
-    }
-
     if (!metricsON) {
       super.handle(schedulerEvent);
       return;
