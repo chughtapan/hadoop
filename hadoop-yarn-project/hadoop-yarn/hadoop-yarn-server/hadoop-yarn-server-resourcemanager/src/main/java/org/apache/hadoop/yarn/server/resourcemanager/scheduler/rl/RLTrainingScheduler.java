@@ -93,7 +93,10 @@ public class RLTrainingScheduler extends
 
   private final int resource_count = 2;
   private final int queue_size = 10;
-  private final int feature_count = (resource_count + 1) * queue_size + resource_count;
+  private final int feature_count = (resource_count + 1) * queue_size + 2 * resource_count;
+  // Feature Vector = [Count, CPU, Memory] * Queue Size +
+  // [Total Remaining CPU Demands, Total Remaining Memory Demands] +
+  // [Total Available CPU on Node, Total Available Memory on Node]
 
   private static final long DEFAULT_ASYNC_SCHEDULER_INTERVAL = 5;
   private AsyncScheduleThread asyncSchedulerThread;
@@ -101,7 +104,6 @@ public class RLTrainingScheduler extends
   private float[] feature_vector = new float[feature_count];
   private List<ApplicationId> applicationIds = new ArrayList<ApplicationId>();
   private List<SchedulerRequestKey> schedulerRequestKeys = new ArrayList<SchedulerRequestKey>();
-
 
   private final Queue DEFAULT_QUEUE = new Queue() {
     @Override
@@ -915,6 +917,7 @@ public class RLTrainingScheduler extends
     private AtomicBoolean runSchedules = new AtomicBoolean(false);
     private final ZContext zContext;
     private ZMQ.Socket socket;
+    private long previous = 0;
 
     public AsyncScheduleThread(RLTrainingScheduler scheduler) {
       this.scheduler = scheduler;
@@ -943,10 +946,15 @@ public class RLTrainingScheduler extends
             Thread.sleep(5);
           }
           else {
-            scheduler.updateQueueState();
-            scheduler.updateNodeState();
-            String request = scheduler.getInputFeatures();
-            LOG.info("Feature Vector: " + request);
+            boolean jobsWaiting = scheduler.updateQueueState();
+            boolean jobsExecuting = scheduler.updateNodeState();
+            long time = System.currentTimeMillis();
+            long reward = (previous != 0) ? (previous - time) : 0;
+            previous = (jobsWaiting || jobsExecuting) ? time : 0;
+
+            String features = scheduler.getInputFeatures();
+            LOG.info("Feature Vector: " + features + "\tReward: " + reward);
+            String request = features + " : " + reward;
             socket.send(request);
             String resp = socket.recvStr();
             int action = Integer.valueOf(resp);
@@ -974,15 +982,18 @@ public class RLTrainingScheduler extends
     return DEFAULT_ASYNC_SCHEDULER_INTERVAL;
   }
 
-  void updateQueueState() throws InterruptedException {
+  // Returns true if there are any pending demands
+  // Returns false if there are no pending demands
+  boolean updateQueueState() {
     int queue_entries_done = 0;
     int offset = 0;
+    float pendingVirtualCores = 0;
+    float pendingMemory = 0;
+    boolean pendingAllocations = false;
     applicationIds.clear();
     schedulerRequestKeys.clear();
     for (Map.Entry<ApplicationId, SchedulerApplication<FifoAppAttempt>> e : applications
             .entrySet()) {
-      if (queue_entries_done == queue_size)
-        break;
       FifoAppAttempt application = e.getValue().getCurrentAppAttempt();
       if (application == null) {
         continue;
@@ -1003,14 +1014,20 @@ public class RLTrainingScheduler extends
           if (count == 0) {
             continue;
           }
+          pendingAllocations = true;
           Resource resource = pendingAsk.getPerAllocationResource();
           Resource normalized = getNormalizedResource(resource, getMaximumAllocation());
-          feature_vector[offset++] = count;
-          feature_vector[offset++] = normalized.getVirtualCores();
-          feature_vector[offset++] = normalized.getMemorySize();
-          applicationIds.add(e.getKey());
-          schedulerRequestKeys.add(schedulerKey);
-          queue_entries_done++;
+          if (queue_entries_done < queue_size) {
+            feature_vector[offset++] = count;
+            feature_vector[offset++] = normalized.getVirtualCores();
+            feature_vector[offset++] = normalized.getMemorySize();
+            applicationIds.add(e.getKey());
+            schedulerRequestKeys.add(schedulerKey);
+            queue_entries_done++;
+          } else {
+            pendingVirtualCores += count * normalized.getVirtualCores();
+            pendingMemory += count * normalized.getMemorySize();
+          }
         }
       }
     }
@@ -1020,26 +1037,41 @@ public class RLTrainingScheduler extends
       feature_vector[offset++] = 0;
       queue_entries_done++;
     }
+    feature_vector[offset++] = pendingVirtualCores;
+    feature_vector[offset++] = pendingVirtualCores;
+    return pendingAllocations;
   }
 
-  void updateNodeState() throws InterruptedException {
+  // Returns true if some resources on the node are currently used
+  // Returns false otherwise
+  boolean updateNodeState() {
     List<FiCaSchedulerNode> nodes = nodeTracker.getAllNodes();
     assert (nodes.size() <= 1);
-    int offset = (resource_count + 1) * queue_size;
+    boolean resourcesAllocated = false;
+    int offset = (resource_count + 1) * queue_size + resource_count;
     if (nodes.size() == 0) {
       feature_vector[offset++] = 0;
       feature_vector[offset++] = 0;
-      return;
     } else {
       // Should only be one node in the collection for now
       FiCaSchedulerNode node = nodes.get(0);
       feature_vector[offset++] = node.getUnallocatedResource().getVirtualCores();
       feature_vector[offset++] = node.getUnallocatedResource().getMemorySize();
+
+      if (Resources.lessThan(resourceCalculator, getClusterResource(),
+              node.getUnallocatedResource(), node.getTotalResource())) {
+        resourcesAllocated = true;
+      }
     }
+    return resourcesAllocated;
   }
 
-  String getInputFeatures() throws InterruptedException {
+  String getInputFeatures() {
     return Arrays.toString(feature_vector);
+  }
+
+  int getReward() {
+    return -1;
   }
 
   boolean skipSchedulingThisRound() {
