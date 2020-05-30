@@ -939,7 +939,10 @@ public class RLTrainingScheduler extends
         try {
           if (!runSchedules.get()) {
             Thread.sleep(100);
-          } else {
+          } else if (scheduler.skipSchedulingThisRound()) {
+            Thread.sleep(5);
+          }
+          else {
             scheduler.updateQueueState();
             scheduler.updateNodeState();
             String request = scheduler.getInputFeatures();
@@ -1037,6 +1040,15 @@ public class RLTrainingScheduler extends
 
   String getInputFeatures() throws InterruptedException {
     return Arrays.toString(feature_vector);
+  }
+
+  boolean skipSchedulingThisRound() {
+    FiCaSchedulerNode node = nodeTracker.getAllNodes().get(0);
+    if (Resources.lessThan(resourceCalculator, getClusterResource(),
+            node.getUnallocatedResource(), minimumAllocation)) {
+      return true;
+    }
+    return false;
   }
 
   void takeAction(int action) throws InterruptedException {
