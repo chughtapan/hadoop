@@ -1016,17 +1016,20 @@ public class RLTrainingScheduler extends
           }
           pendingAllocations = true;
           Resource resource = pendingAsk.getPerAllocationResource();
-          Resource normalized = getNormalizedResource(resource, getMaximumAllocation());
+          float cores = ((float) resource.getVirtualCores())
+                  / getMinimumAllocation().getVirtualCores();
+          float memory = ((float) resource.getMemorySize())
+                  / getMinimumAllocation().getMemorySize();
           if (queue_entries_done < queue_size) {
             feature_vector[offset++] = count;
-            feature_vector[offset++] = normalized.getVirtualCores();
-            feature_vector[offset++] = normalized.getMemorySize();
+            feature_vector[offset++] = cores;
+            feature_vector[offset++] = memory;
             applicationIds.add(e.getKey());
             schedulerRequestKeys.add(schedulerKey);
             queue_entries_done++;
           } else {
-            pendingVirtualCores += count * normalized.getVirtualCores();
-            pendingMemory += count * normalized.getMemorySize();
+            pendingVirtualCores += count * cores;
+            pendingMemory += count * memory;
           }
         }
       }
@@ -1038,7 +1041,7 @@ public class RLTrainingScheduler extends
       queue_entries_done++;
     }
     feature_vector[offset++] = pendingVirtualCores;
-    feature_vector[offset++] = pendingVirtualCores;
+    feature_vector[offset++] = pendingMemory;
     return pendingAllocations;
   }
 
@@ -1055,8 +1058,10 @@ public class RLTrainingScheduler extends
     } else {
       // Should only be one node in the collection for now
       FiCaSchedulerNode node = nodes.get(0);
-      feature_vector[offset++] = node.getUnallocatedResource().getVirtualCores();
-      feature_vector[offset++] = node.getUnallocatedResource().getMemorySize();
+      feature_vector[offset++] = ((float) node.getUnallocatedResource().getVirtualCores())
+              / getMinimumAllocation().getVirtualCores();
+      feature_vector[offset++] = ((float) node.getUnallocatedResource().getMemorySize())
+              / getMinimumAllocation().getMemorySize();
 
       if (Resources.lessThan(resourceCalculator, getClusterResource(),
               node.getUnallocatedResource(), node.getTotalResource())) {
