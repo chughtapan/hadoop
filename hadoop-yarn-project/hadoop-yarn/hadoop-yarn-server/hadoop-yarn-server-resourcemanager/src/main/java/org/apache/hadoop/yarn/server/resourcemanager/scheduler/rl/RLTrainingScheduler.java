@@ -927,7 +927,12 @@ public class RLTrainingScheduler extends
 
     public void beginSchedule() {
       socket = zContext.createSocket(SocketType.REQ);
-      socket.connect("tcp://localhost:5555");
+      String port = System.getenv("ZMQ_SERVER_PORT");
+      if (port == null || port.isEmpty()) {
+        port = "5555";
+      }
+      String address = "tcp://localhost:" + port;
+      socket.connect(address);
       runSchedules.set(true);
     }
 

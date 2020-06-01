@@ -166,8 +166,13 @@ public abstract class SchedulerMetrics {
 
     // start web app to provide real-time tracking
     int metricsWebAddressPort = conf.getInt(
-        SLSConfiguration.METRICS_WEB_ADDRESS_PORT,
-        SLSConfiguration.METRICS_WEB_ADDRESS_PORT_DEFAULT);
+            SLSConfiguration.METRICS_WEB_ADDRESS_PORT,
+            SLSConfiguration.METRICS_WEB_ADDRESS_PORT_DEFAULT);
+    String metricsWebAddressPortEnv = System.getenv("SLS_METRICS_PORT");
+    if ((metricsWebAddressPortEnv != null) &&
+            (!metricsWebAddressPortEnv.isEmpty())) {
+      metricsWebAddressPort = Integer.valueOf(metricsWebAddressPortEnv);
+    }
     web = new SLSWebApp((SchedulerWrapper)scheduler, metricsWebAddressPort);
     web.start();
 
