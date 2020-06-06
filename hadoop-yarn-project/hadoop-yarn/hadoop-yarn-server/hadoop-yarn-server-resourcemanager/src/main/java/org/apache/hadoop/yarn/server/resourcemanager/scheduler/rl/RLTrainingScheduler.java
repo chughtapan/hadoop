@@ -547,6 +547,7 @@ public class RLTrainingScheduler extends
       int assignableContainers = Math.min(
               getMaxAllocatableContainers(application, schedulerKey, node,
                       NodeType.NODE_LOCAL), nodeLocalAsk.getCount());
+      assignableContainers = Math.min(assignableContainers, 1);
       assignedContainers =
               assignContainer(node, application, schedulerKey, assignableContainers,
                       nodeLocalAsk.getPerAllocationResource(), NodeType.NODE_LOCAL);
@@ -569,6 +570,7 @@ public class RLTrainingScheduler extends
       int assignableContainers =
               Math.min(getMaxAllocatableContainers(application, schedulerKey, node,
                       NodeType.RACK_LOCAL), rackAsk.getCount());
+      assignableContainers = Math.min(assignableContainers, 1);
       assignedContainers =
               assignContainer(node, application, schedulerKey, assignableContainers,
                       rackAsk.getPerAllocationResource(), NodeType.RACK_LOCAL);
@@ -581,10 +583,12 @@ public class RLTrainingScheduler extends
     int assignedContainers = 0;
     PendingAsk offswitchAsk = application.getPendingAsk(schedulerKey,
             ResourceRequest.ANY);
+    int assignableContainers = Math.min(offswitchAsk.getCount(), 1);
+
     if (offswitchAsk.getCount() > 0) {
       assignedContainers =
               assignContainer(node, application, schedulerKey,
-                      offswitchAsk.getCount(),
+                      assignableContainers,
                       offswitchAsk.getPerAllocationResource(), NodeType.OFF_SWITCH);
     }
     return assignedContainers;
