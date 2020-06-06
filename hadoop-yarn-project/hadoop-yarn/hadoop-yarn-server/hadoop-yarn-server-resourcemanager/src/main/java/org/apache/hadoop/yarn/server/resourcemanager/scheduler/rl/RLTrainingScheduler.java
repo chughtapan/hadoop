@@ -947,10 +947,7 @@ public class RLTrainingScheduler extends
         try {
           if (!runSchedules.get()) {
             Thread.sleep(100);
-          } else if (scheduler.skipSchedulingThisRound()) {
-            Thread.sleep(5);
-          }
-          else {
+          } else {
             boolean jobsWaiting = scheduler.updateQueueState();
             boolean jobsExecuting = scheduler.updateNodeState();
             long time = System.currentTimeMillis();
