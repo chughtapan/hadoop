@@ -965,8 +965,10 @@ public class RLTrainingScheduler extends
             String resp = socket.recvStr();
             int action = Integer.valueOf(resp);
             LOG.info("Got Action: " + action);
-            scheduler.takeAction(action);
-            Thread.sleep(scheduler.getAsyncScheduleInterval());
+            boolean validAction = scheduler.takeAction(action);
+            if (!validAction) {
+              Thread.sleep(scheduler.getAsyncScheduleInterval());
+            }
             if (LOG.isDebugEnabled()) {
               // Adding a debug log here to ensure that the thread is alive
               // and running fine.
@@ -1094,14 +1096,17 @@ public class RLTrainingScheduler extends
     return false;
   }
 
-  void takeAction(int action) throws InterruptedException {
+  /* Returns true if some action was taken
+  *  Else returns false */
+  boolean takeAction(int action) throws InterruptedException {
+    boolean retVal = false;
     FiCaSchedulerNode node = nodeTracker.getAllNodes().get(0);
     if (nodeTracker.getAllNodes().size() == 0) {
       LOG.debug("No active nodes. Returning!");
     } else
     if (action >= queue_size) {
       LOG.debug("Selected NOOP action. Returning!");
-      return;
+      return retVal;
     } else if ((action >= applicationIds.size()) || (action >= schedulerRequestKeys.size())) {
       LOG.debug("Selected null queue element. Returning!");
     } else {
@@ -1114,24 +1119,18 @@ public class RLTrainingScheduler extends
       SchedulerRequestKey schedulerKey = schedulerRequestKeys.get(action);
       int assignedContainers =
               assignContainersOnNode(node, application, schedulerKey);
+
+      if (assignedContainers > 0) {
+        assert (assignedContainers == 1);
+        retVal = true;
+      }
+
+      // Update the applications' headroom to correctly take into
+      // account the containers assigned in this update.
+      updateAppHeadRoom(application);
       LOG.debug("Allocated " + assignedContainers);
     }
-
-    if (!Resources.lessThan(resourceCalculator, getClusterResource(),
-            node.getUnallocatedResource(), minimumAllocation)) {
-      LOG.info("Available resources more than minimumAllocation.");
-    }
-
-    // Update the applications' headroom to correctly take into
-    // account the containers assigned in this update.
-    for (SchedulerApplication<FifoAppAttempt> application : applications.values()) {
-      FifoAppAttempt attempt =
-              (FifoAppAttempt) application.getCurrentAppAttempt();
-      if (attempt == null) {
-        continue;
-      }
-      updateAppHeadRoom(attempt);
-    }
+    return retVal;
   }
 }
 
