@@ -98,7 +98,7 @@ public class RLTrainingScheduler extends
   // [Total Remaining CPU Demands, Total Remaining Memory Demands] +
   // [Total Available CPU on Node, Total Available Memory on Node]
 
-  private static final long DEFAULT_ASYNC_SCHEDULER_INTERVAL = 5;
+  private static final long DEFAULT_ASYNC_SCHEDULER_INTERVAL = 100;
   private AsyncScheduleThread asyncSchedulerThread;
 
   private float[] feature_vector = new float[feature_count];
