@@ -509,27 +509,28 @@ public class RLTrainingScheduler extends
                                      FifoAppAttempt application, SchedulerRequestKey schedulerKey
   ) {
     // Data-local
-    int nodeLocalContainers =
+    int assignedContainers =
             assignNodeLocalContainers(node, application, schedulerKey);
 
-    // Rack-local
-    int rackLocalContainers =
-            assignRackLocalContainers(node, application, schedulerKey);
-
-    // Off-switch
-    int offSwitchContainers =
-            assignOffSwitchContainers(node, application, schedulerKey);
-
+    if (assignedContainers == 0) {
+      // Rack-local
+       assignedContainers =
+              assignRackLocalContainers(node, application, schedulerKey);
+    }
+    if (assignedContainers == 0) {
+      // Off-switch
+      assignedContainers =
+              assignOffSwitchContainers(node, application, schedulerKey);
+    }
 
     LOG.debug("assignContainersOnNode:" +
             " node=" + node.getRMNode().getNodeAddress() +
             " application=" + application.getApplicationId().getId() +
             " priority=" + schedulerKey.getPriority() +
-            " #assigned=" +
-            (nodeLocalContainers + rackLocalContainers + offSwitchContainers));
+            " #assigned=" + assignedContainers);
 
 
-    return (nodeLocalContainers + rackLocalContainers + offSwitchContainers);
+    return assignedContainers;
   }
 
   private int assignNodeLocalContainers(FiCaSchedulerNode node,
