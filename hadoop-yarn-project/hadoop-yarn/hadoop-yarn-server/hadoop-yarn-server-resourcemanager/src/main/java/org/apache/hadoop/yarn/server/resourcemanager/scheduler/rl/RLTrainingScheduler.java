@@ -1086,6 +1086,7 @@ public class RLTrainingScheduler extends
             / getMinimumAllocation().getVirtualCores();
     feature_vector[offset++] = ((float) previous_action_allocation.getMemorySize())
             / getMinimumAllocation().getMemorySize();
+    feature_vector[offset++] = previous_action;
     return resourcesAllocated;
   }
 
