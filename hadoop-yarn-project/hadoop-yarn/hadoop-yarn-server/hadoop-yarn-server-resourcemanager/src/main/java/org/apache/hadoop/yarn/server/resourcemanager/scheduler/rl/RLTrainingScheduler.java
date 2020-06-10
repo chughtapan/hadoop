@@ -107,7 +107,7 @@ public class RLTrainingScheduler extends
   private List<ApplicationId> applicationIds = new ArrayList<ApplicationId>();
   private List<SchedulerRequestKey> schedulerRequestKeys = new ArrayList<SchedulerRequestKey>();
 
-  private int previous_action;
+  private int previous_action = queue_size;
   private Resource previous_action_allocation;
   private final Queue DEFAULT_QUEUE = new Queue() {
     @Override
@@ -1087,12 +1087,11 @@ public class RLTrainingScheduler extends
               / getMinimumAllocation().getVirtualCores();
       feature_vector[offset++] = ((float) previous_action_allocation.getMemorySize())
               / getMinimumAllocation().getMemorySize();
-      feature_vector[offset++] = previous_action;
     } else {
       feature_vector[offset++] = 0;
       feature_vector[offset++] = 0;
-      feature_vector[offset++] = queue_size;
     }
+    feature_vector[offset++] = previous_action;
     return resourcesAllocated;
   }
 
@@ -1121,6 +1120,7 @@ public class RLTrainingScheduler extends
     } else
     if (action >= queue_size) {
       LOG.debug("Selected NOOP action. Returning!");
+      previous_action_allocation = null;
       return retVal;
     } else if ((action >= applicationIds.size()) || (action >= schedulerRequestKeys.size())) {
       LOG.debug("Selected null queue element. Returning!");
@@ -1147,8 +1147,7 @@ public class RLTrainingScheduler extends
     }
     if (!retVal) {
       // Nothing was allocated in the previous iteration
-      previous_action_allocation.setVirtualCores(0);
-      previous_action_allocation.setMemorySize(0);
+      previous_action_allocation = null;
     }
     return retVal;
   }
