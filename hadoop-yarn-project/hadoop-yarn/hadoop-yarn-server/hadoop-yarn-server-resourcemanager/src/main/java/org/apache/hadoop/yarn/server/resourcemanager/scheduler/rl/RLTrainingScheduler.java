@@ -93,8 +93,8 @@ public class RLTrainingScheduler extends
 
   private final int resource_count = 2;
   private final int queue_size = 10;
-  private final int feature_count = (resource_count + 1) * queue_size + 3 * resource_count + 1;
-  // Feature Vector = [Count, CPU, Memory] * Queue Size +
+  private final int feature_count = (2 * resource_count + 1) * queue_size + 3 * resource_count + 1;
+  // Feature Vector = [Count, CPU, Memory, Prev Allocated CPU, Prev Allocated Memory] * Queue Size +
   // [Total Remaining CPU Demands, Total Remaining Memory Demands] +
   // [Total Available CPU on Node, Total Available Memory on Node] +
   // [CPU Allocated due to prev action, Memory Allocated due to previous action] +
@@ -106,9 +106,10 @@ public class RLTrainingScheduler extends
   private float[] feature_vector = new float[feature_count];
   private List<ApplicationId> applicationIds = new ArrayList<ApplicationId>();
   private List<SchedulerRequestKey> schedulerRequestKeys = new ArrayList<SchedulerRequestKey>();
+  private Map<ApplicationId, Resource> applicationResourceMap = new HashMap<ApplicationId, Resource>();
 
   private int previous_action = queue_size;
-  private Resource previous_action_allocation;
+  private Resource previous_action_allocation = Resources.createResource(0, 0);
   private final Queue DEFAULT_QUEUE = new Queue() {
     @Override
     public String getQueueName() {
@@ -1034,10 +1035,23 @@ public class RLTrainingScheduler extends
                   / getMinimumAllocation().getVirtualCores();
           float memory = ((float) resource.getMemorySize())
                   / getMinimumAllocation().getMemorySize();
+
+          float allocatedCores = 0;
+          float allocatedMemory = 0;
+          Resource allocatedResource = applicationResourceMap.getOrDefault(e.getKey(),
+                  Resources.createResource(0, 0));
+          allocatedCores = ((float) allocatedResource.getVirtualCores())
+                    / getMinimumAllocation().getVirtualCores();
+          allocatedMemory = ((float) allocatedResource.getMemorySize())
+                    / getMinimumAllocation().getMemorySize();
+
           if (queue_entries_done < queue_size) {
             feature_vector[offset++] = count;
             feature_vector[offset++] = cores;
             feature_vector[offset++] = memory;
+            feature_vector[offset++] = allocatedCores;
+            feature_vector[offset++] = allocatedMemory;
+
             applicationIds.add(e.getKey());
             schedulerRequestKeys.add(schedulerKey);
             queue_entries_done++;
@@ -1049,6 +1063,8 @@ public class RLTrainingScheduler extends
       }
     }
     while (queue_entries_done < queue_size) {
+      feature_vector[offset++] = 0;
+      feature_vector[offset++] = 0;
       feature_vector[offset++] = 0;
       feature_vector[offset++] = 0;
       feature_vector[offset++] = 0;
@@ -1065,7 +1081,7 @@ public class RLTrainingScheduler extends
     List<FiCaSchedulerNode> nodes = nodeTracker.getAllNodes();
     assert (nodes.size() <= 1);
     boolean resourcesAllocated = false;
-    int offset = (resource_count + 1) * queue_size + resource_count;
+    int offset = (2 * resource_count + 1) * queue_size + resource_count;
     if (nodes.size() == 0) {
       feature_vector[offset++] = 0;
       feature_vector[offset++] = 0;
@@ -1120,7 +1136,7 @@ public class RLTrainingScheduler extends
     } else
     if (action >= queue_size) {
       LOG.debug("Selected NOOP action. Returning!");
-      previous_action_allocation = null;
+      previous_action_allocation = Resources.createResource(0,0);
       return retVal;
     } else if ((action >= applicationIds.size()) || (action >= schedulerRequestKeys.size())) {
       LOG.debug("Selected null queue element. Returning!");
@@ -1137,6 +1153,11 @@ public class RLTrainingScheduler extends
 
       if (assignedContainers > 0) {
         assert (assignedContainers == 1);
+        if (!applicationResourceMap.containsKey(applicationId)) {
+          applicationResourceMap.put(applicationId,
+                  Resources.createResource(0, 0));
+        }
+        Resources.addTo(applicationResourceMap.get(applicationId), previous_action_allocation);
         retVal = true;
       }
 
@@ -1147,7 +1168,7 @@ public class RLTrainingScheduler extends
     }
     if (!retVal) {
       // Nothing was allocated in the previous iteration
-      previous_action_allocation = null;
+      previous_action_allocation = Resources.createResource(0, 0);
     }
     return retVal;
   }
