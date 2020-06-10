@@ -1082,11 +1082,17 @@ public class RLTrainingScheduler extends
         resourcesAllocated = true;
       }
     }
-    feature_vector[offset++] = ((float) previous_action_allocation.getVirtualCores())
-            / getMinimumAllocation().getVirtualCores();
-    feature_vector[offset++] = ((float) previous_action_allocation.getMemorySize())
-            / getMinimumAllocation().getMemorySize();
-    feature_vector[offset++] = previous_action;
+    if (previous_action_allocation != null) {
+      feature_vector[offset++] = ((float) previous_action_allocation.getVirtualCores())
+              / getMinimumAllocation().getVirtualCores();
+      feature_vector[offset++] = ((float) previous_action_allocation.getMemorySize())
+              / getMinimumAllocation().getMemorySize();
+      feature_vector[offset++] = previous_action;
+    } else {
+      feature_vector[offset++] = 0;
+      feature_vector[offset++] = 0;
+      feature_vector[offset++] = queue_size;
+    }
     return resourcesAllocated;
   }
 
