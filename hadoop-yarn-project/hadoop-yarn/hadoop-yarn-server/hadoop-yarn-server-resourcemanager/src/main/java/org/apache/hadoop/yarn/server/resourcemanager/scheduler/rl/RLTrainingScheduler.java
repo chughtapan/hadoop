@@ -93,10 +93,12 @@ public class RLTrainingScheduler extends
 
   private final int resource_count = 2;
   private final int queue_size = 10;
-  private final int feature_count = (resource_count + 1) * queue_size + 2 * resource_count;
+  private final int feature_count = (resource_count + 1) * queue_size + 3 * resource_count + 1;
   // Feature Vector = [Count, CPU, Memory] * Queue Size +
   // [Total Remaining CPU Demands, Total Remaining Memory Demands] +
-  // [Total Available CPU on Node, Total Available Memory on Node]
+  // [Total Available CPU on Node, Total Available Memory on Node] +
+  // [CPU Allocated due to prev action, Memory Allocated due to previous action] +
+  // Previous Action
 
   private static final long DEFAULT_ASYNC_SCHEDULER_INTERVAL = 100;
   private AsyncScheduleThread asyncSchedulerThread;
@@ -105,6 +107,8 @@ public class RLTrainingScheduler extends
   private List<ApplicationId> applicationIds = new ArrayList<ApplicationId>();
   private List<SchedulerRequestKey> schedulerRequestKeys = new ArrayList<SchedulerRequestKey>();
 
+  private int previous_action;
+  private Resource previous_action_allocation;
   private final Queue DEFAULT_QUEUE = new Queue() {
     @Override
     public String getQueueName() {
@@ -636,6 +640,7 @@ public class RLTrainingScheduler extends
 
         // Update usage for this container
         increaseUsedResources(rmContainer);
+        previous_action_allocation = rmContainer.getAllocatedResource();
       }
 
     }
@@ -1077,15 +1082,15 @@ public class RLTrainingScheduler extends
         resourcesAllocated = true;
       }
     }
+    feature_vector[offset++] = ((float) previous_action_allocation.getVirtualCores())
+            / getMinimumAllocation().getVirtualCores();
+    feature_vector[offset++] = ((float) previous_action_allocation.getMemorySize())
+            / getMinimumAllocation().getMemorySize();
     return resourcesAllocated;
   }
 
   String getInputFeatures() {
     return Arrays.toString(feature_vector);
-  }
-
-  int getReward() {
-    return -1;
   }
 
   boolean skipSchedulingThisRound() {
@@ -1100,6 +1105,8 @@ public class RLTrainingScheduler extends
   /* Returns true if some action was taken
   *  Else returns false */
   boolean takeAction(int action) throws InterruptedException {
+    previous_action = action;
+
     boolean retVal = false;
     FiCaSchedulerNode node = nodeTracker.getAllNodes().get(0);
     if (nodeTracker.getAllNodes().size() == 0) {
@@ -1130,6 +1137,11 @@ public class RLTrainingScheduler extends
       // account the containers assigned in this update.
       updateAppHeadRoom(application);
       LOG.debug("Allocated " + assignedContainers);
+    }
+    if (!retVal) {
+      // Nothing was allocated in the previous iteration
+      previous_action_allocation.setVirtualCores(0);
+      previous_action_allocation.setMemorySize(0);
     }
     return retVal;
   }
