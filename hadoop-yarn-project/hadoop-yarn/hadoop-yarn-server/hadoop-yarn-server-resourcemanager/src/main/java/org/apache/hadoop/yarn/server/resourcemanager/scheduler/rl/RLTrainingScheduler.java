@@ -107,6 +107,7 @@ public class RLTrainingScheduler extends
   private List<ApplicationId> applicationIds = new ArrayList<ApplicationId>();
   private List<SchedulerRequestKey> schedulerRequestKeys = new ArrayList<SchedulerRequestKey>();
   private Map<ApplicationId, Resource> applicationResourceMap = new HashMap<ApplicationId, Resource>();
+  int activeApplicationCount = 0;
 
   private int previous_action = queue_size;
   private Resource previous_action_allocation = Resources.createResource(0, 0);
@@ -962,10 +963,11 @@ public class RLTrainingScheduler extends
             boolean jobsWaiting = scheduler.updateQueueState();
             boolean jobsExecuting = scheduler.updateNodeState();
             long time = System.currentTimeMillis();
-            long reward = (previous != 0) ? (previous - time) : 0;
+            long reward = (previous != 0) ? scheduler.getActiveApplicationCount() * (previous - time) : 0;
             previous = (jobsWaiting || jobsExecuting) ? time : 0;
 
             String features = scheduler.getInputFeatures();
+            LOG.info("Currently active applications: " + scheduler.getActiveApplicationCount());
             LOG.info("Feature Vector: " + features + "\tReward: " + reward);
             String request = features + " : " + reward;
             socket.send(request);
@@ -1005,6 +1007,9 @@ public class RLTrainingScheduler extends
     float pendingVirtualCores = 0;
     float pendingMemory = 0;
     boolean pendingAllocations = false;
+
+    Set<ApplicationId> pendingApplications = new HashSet<ApplicationId>();
+
     applicationIds.clear();
     schedulerRequestKeys.clear();
     for (Map.Entry<ApplicationId, SchedulerApplication<FifoAppAttempt>> e : applications
@@ -1015,6 +1020,9 @@ public class RLTrainingScheduler extends
       }
 
       synchronized (application) {
+        if (application.isPending() || (application.getLiveContainers().size() > 0))
+          pendingApplications.add(e.getKey());
+
         // Check if this resource is on the blacklist
         // Ignoring this constraint for now
         // if (SchedulerAppUtils.isPlaceBlacklisted(application, node, LOG)) {
@@ -1072,7 +1080,13 @@ public class RLTrainingScheduler extends
     }
     feature_vector[offset++] = pendingVirtualCores;
     feature_vector[offset++] = pendingMemory;
+
+    activeApplicationCount = pendingApplications.size();
     return pendingAllocations;
+  }
+
+  int getActiveApplicationCount() {
+    return activeApplicationCount;
   }
 
   // Returns true if some resources on the node are currently used
